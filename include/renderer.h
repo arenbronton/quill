@@ -1,0 +1,1 @@
+void renderFile(char lines[10][20]);
