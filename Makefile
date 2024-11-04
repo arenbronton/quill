@@ -1,2 +1,2 @@
 main:
-	g++ src/main.c src/renderer.c -o main -Iinclude
+	gcc -std=c99 src/main.c src/renderer.c src/structures.c -o bin/quill -Iinclude

@@ -1,6 +1,6 @@
-# Terminal Text Editor
+## Terminal Text Editor
 
-[x] Keyboard input
-[ ] Vim movements
-[ ] Saving to file
-[ ] Custom configuration
+- [x] Keyboard input
+- [ ] Vim movements
+- [ ] Saving to file
+- [ ] Custom configuration

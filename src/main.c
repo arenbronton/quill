@@ -1,46 +1,43 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <windows.h>
 #include "renderer.h"
+#include "quill.h"
+#include "structures.h"
 
-// void printLines(char lines[10][20])
-// {
-//     for (int i = 0; i < 10; i++)
-//     {
-//         // printf("\u001b[33 %d", i);
-//         // printf("\u001b[37] ");
-
-//         printf("%d ", i);
-//         for (int j = 0; j < 20; j++)
-//         {
-//             printf("%c", lines[i][j]);
-//         }
-//         printf("\n");
-//     }
-// }
-
-void moveCursor(short x, short y)
+void ensure_cursor_bounds(EditorMode *editMode)
 {
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD position = {x, y};
-    SetConsoleCursorPosition(hConsole, position);
+    if (editMode->cursor_x < 0)
+        editMode->cursor_x = 0;
+    if (editMode->cursor_y < 0)
+        editMode->cursor_y = 0;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     // hInput is a pointer to the std input stream
     HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
 
+    // Terminal Input Mode
     DWORD mode;
     GetConsoleMode(hInput, &mode);
     SetConsoleMode(hInput, mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
 
     // LINES
-    char lines[10][20] = {{' '}};
-    int currentLine = 0;
-    int currentRow = 0;
+    char lines[20][30] = {{' '}};
 
+    // EDITOR MODE
+    EditorMode editMode;
+    editMode.mode = NORMAL;
+    editMode.cursor_x = 0;
+    editMode.cursor_y = 0;
+    // COMMAND BUFFER
+    Stack *command_buffer = create_stack(5);
+
+    // Input Events
     INPUT_RECORD inputRecord;
     DWORD events;
+
     while (1)
     {
         ReadConsoleInput(hInput, &inputRecord, 1, &events);
@@ -48,52 +45,72 @@ int main(void)
         if (inputRecord.EventType == KEY_EVENT && inputRecord.Event.KeyEvent.bKeyDown)
         {
             char c = inputRecord.Event.KeyEvent.uChar.AsciiChar;
-            if (c == 'q')
-                break;
 
-            if (c == '\b')
+            // HANDLE COMMANDS
+            if (editMode.mode == NORMAL)
             {
-                if (currentRow == 0)
-                {
-                    lines[currentLine][currentRow] = ' ';
-                    currentLine--;
-                    currentRow = 19;
+                if (c == '\b')
+                    pop_ignore(command_buffer);
 
-                    while (currentRow > 0 && lines[currentLine][currentRow] == ' ')
+                else if (c == '\r')
+                {
+                    if (strcmp(command_buffer->collection, ":q") == 0)
                     {
-                        currentRow--;
+                        break;
+                    }
+                }
+                else
+                    push(command_buffer, c);
+            }
+
+            // * HANDLE BACKSPACE
+            else if (c == '\b')
+            {
+                if (editMode.cursor_x == 0)
+                {
+                    lines[editMode.cursor_y][editMode.cursor_x] = ' ';
+                    editMode.cursor_y--;
+                    editMode.cursor_x = 19;
+
+                    while (editMode.cursor_x > 0 && lines[editMode.cursor_y][editMode.cursor_x] == ' ')
+                    {
+                        editMode.cursor_x--;
                     }
 
-                    currentRow++;
+                    editMode.cursor_x++;
                 }
                 else
                 {
-                    currentRow--;
-                    lines[currentLine][currentRow] = ' ';
+                    editMode.cursor_x--;
+                    lines[editMode.cursor_y][editMode.cursor_x] = ' ';
                 }
             }
+
+            // * HANDLE ENTER PRESSED
             else if (c == '\r')
             {
-                currentRow = 0;
-                currentLine++;
+                editMode.cursor_x = 0;
+                editMode.cursor_y++;
             }
             else
             {
-                lines[currentLine][currentRow] = c;
-                currentRow++;
+                lines[editMode.cursor_y][editMode.cursor_x] = c;
+                editMode.cursor_x++;
             }
 
-            if (currentRow < 0)
-                currentRow = 0;
-            if (currentLine < 0)
-                currentLine = 0;
-
-            system("cls");
-            renderFile(lines);
+            ensure_cursor_bounds(&editMode);
         }
+
+        system("cls");
+        renderFile(lines, &editMode, command_buffer);
+        moveCursor(editMode.cursor_x + 1, editMode.cursor_y);
     }
 
     SetConsoleMode(hInput, mode);
+
+    // END PROGRAM
+    system("cls");
+    destroy_stack(command_buffer);
 
     return 0;
 }
